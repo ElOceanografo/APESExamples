@@ -85,9 +85,9 @@ savefig(joinpath(@__DIR__, "plots/echograms.png"))
 @everywhere begin
 
     @model function echomodel(data, params)
-        cv ~ Exponential(0.5)
-        a ~ truncated(Normal(2e-3, 2e-3), 0, 0.21)
-        δ ~ Uniform(0.1, 1.5)
+        cv ~ Exponential(0.1)
+        a ~ Uniform(1e-5, 1e-2)#truncated(Normal(2e-3, 4e-3), 0, 0.21)
+        δ = 0.3
         bubble = Bubble(a, depth=data.coords[1], δ=δ)
         TS_bubble = [target_strength(bubble, f*1e3) for f in freqs]
         TS = [params.TS TS_bubble]
@@ -102,23 +102,69 @@ savefig(joinpath(@__DIR__, "plots/echograms.png"))
                 data.backscatter[i] ~ Normal(sv_pred[i], ηsv[i])
             end
         end
+
+        return 10log10.(sv_pred)
     end
 
 end
 
 krill = resize(Models.krill_mcgeehee, 0.025)
+# estimates from Lucca et al. 2021
+krill.g .= 1.019
+krill.h .= 1.032
 TS_krill = [target_strength(krill, f*1e3, 1468.0) for f in freqs]
 TS_fish = [-34.6, -35.0, -35.6, -36.6, -38.5]
+TS_myctophid = [-73.0, -58.0, -65, -67.2, -70.0]
 
+pars = (TS =    [TS_fish TS_myctophid TS_krill], 
+        prior = [Normal(-3, 3),  # big fish
+                 Normal(-2, 3),  # myctophid
+                 Normal(-2, 3),  # krill
+                 Normal(-2, 3)]) # small bubble-like
 
 solver_map = MAPSolver(optimizer=SimulatedAnnealing(), verbose=false)
-pars = (TS =    [TS_fish TS_krill], 
-        prior = [Normal(-2, 2), Normal(0, 2), Normal(0, 2)])
-solution_map = apes(sv[1:50, :, :], echomodel, solver_map, params=pars, distributed=true)
-heatmap([coef(x)[Symbol("logn[2]")] for x in solution_map], yflip=true)
+
+solution_map = apes(sv, echomodel, solver_map, params=pars, distributed=true)
+
+fmissing(x, f) = ismissing(x) ? missing : f(x)
+
+heatmap(fmissing.(solution_map, x -> coef(x)[Symbol("logn[4]")]), yflip=true)
 
 
-solver_mcmc = MCMCSolver(verbose=false, nsamples=500)
+solver_mcmc = MCMCSolver(verbose=false)
 solution_mcmc = apes(sv, echomodel, solver_mcmc, params=pars, distributed=true)
 
-heatmap([ismissing(chn) ? missing : median(chn[:a]) for chn in solution_mcmc], yflip=true)
+threshold_mask = mapspectra(x -> all(x.backscatter .> -90), Sv)
+
+heatmap(fmissing.(solution_mcmc, chn -> median(1e3chn[:a])), yflip=true)
+heatmap(fmissing.(solution_mcmc, chn -> std(1e3chn[:a])), yflip=true, c=:viridis, clims=())
+# heatmap(fmissing.(solution_mcmc, chn -> mean(chn[:δ])), yflip=true)
+
+plot(
+    heatmap(fmissing.(solution_mcmc, chn -> median(chn[Symbol("logn[1]")])), colorbartitle="log₁₀(large fish m⁻³)",
+        xlabel="", xticks=false, clims=(-6, -3)),
+    heatmap(fmissing.(solution_mcmc, chn -> median(chn[Symbol("logn[2]")])), colorbartitle="log₁₀(myctophid m⁻³)",
+        xlabel="", xticks=false, clims=(-4, -1)),
+    heatmap(fmissing.(solution_mcmc, chn -> median(chn[Symbol("logn[3]")])), colorbartitle="log₁₀(krill m⁻³)",
+        xlabel="", xticks=false, clims=(-4, -1)),
+    heatmap(fmissing.(solution_mcmc, chn -> median(chn[Symbol("logn[4]")])), colorbartitle="log₁₀(small bubble m⁻³)",
+        clim=(-7, -6)),
+    yflip=true, layout=(4, 1), size=(600, 600), 
+)
+
+
+plot(
+    heatmap(fmissing.(solution_mcmc, chn -> std(chn[Symbol("logn[1]")])), colorbartitle="log₁₀(large fish m⁻³)",
+        xlabel="", xticks=false, c=:viridis),
+    heatmap(fmissing.(solution_mcmc, chn -> std(chn[Symbol("logn[2]")])), colorbartitle="log₁₀(myctophid m⁻³)",
+        xlabel="", xticks=false, c=:viridis),
+    heatmap(fmissing.(solution_mcmc, chn -> std(chn[Symbol("logn[3]")])), colorbartitle="log₁₀(krill m⁻³)",
+        xlabel="", xticks=false, c=:viridis),
+    heatmap(fmissing.(solution_mcmc, chn -> std(chn[Symbol("logn[4]")])), colorbartitle="log₁₀(small bubble m⁻³)",
+        c=:viridis),
+    yflip=true, layout=(4, 1), size=(600, 600),
+)
+
+
+heatmap(fmissing.(solution_mcmc, chn -> mean(chn[:cv])), yflip=true, c=:viridis, clims=(0.11, 0.93))
+heatmap(fmissing.(solution_mcmc, chn -> mean(chn[:lp])), yflip=true, c=:viridis, clims=(50, 70))
