@@ -10,23 +10,24 @@ using DataFrames, DataFramesMeta, CategoricalArrays
 
 include(joinpath(@__DIR__, "../src/bubbles.jl"))
 
-Random.seed!(12345)
-
 freqs_bb = [15:25; 35:38; 50:87; 100:150]
 freqs_nb = [18, 38, 70, 120]
 freqs_plot = 10:160
 i_nb = indexin(freqs_nb, freqs_bb)
 
 depth = 300.0
-b_hake = Bubble(0.02, depth=depth, δ=2)
-b_myctophid = Bubble(0.00061, depth=depth, δ=0.3)
-b_siphonophore = Bubble(0.00058, depth=depth, δ=0.2)
+# b_hake = Bubble(0.02, depth=depth, δ=2)
+freqs_hake = [18, 38, 70, 120, 200]
+TS_hake = [-34.6, -35.0, -35.6, -36.6, -38.5]
+spline_hake = Spline1D(freqs_hake, TS_hake)
+b_myctophid = Bubble(0.00065, depth=depth, δ=0.4)
+b_siphonophore = Bubble(0.00055, depth=depth, δ=0.2)
 sergestid = resize(Models.krill_mcgeehee, 0.045)
 freqs_squid = [5,    18,  38,   70,    90,   120,   150, 200] .+ 5
 TS_squid = [-45, -33, -34.7, -36.5, -37., -37.25, -37.4, -37.5] .+ 10log10(0.2^2)
 spline_squid = Spline1D(freqs_squid, TS_squid)
 
-ts_hake(freq) = target_strength(b_hake, freq*1e3)
+ts_hake(freq) = spline_hake(freq)# target_strength(b_hake, freq*1e3)
 ts_myctophid(freq) = target_strength(b_myctophid, freq*1e3)
 ts_siph(freq) = target_strength(b_siphonophore, freq*1e3)
 ts_sergestid(freq) = target_strength(sergestid, freq*1e3, 1470)
@@ -52,21 +53,21 @@ scatter!(p1, freqs_bb, TS_bb, label="", color=pal, markerstrokewidth=0)
 vline!(p1, freqs_nb, linestyle=:dot, color=:grey, label="")
 
 
-Random.seed!(123)
-η_bb = 0.5
-η_nb = 0.5
-N = [0.25, 10, 0.0, 170, 7] / 100 # density (per 100 m³, divide by 100 to get m⁻³).  No squid.
+Random.seed!(1234)
+η_bb = 1
+η_nb = 1
+N = [0.25, 10, 0.0, 170, 7] # density (per 100 m³, divide by 100 to get m⁻³).  No squid.
 Sv_bb = 10log10.(Σ_bb * N) .+ η_bb .* randn(length(freqs_bb))
 sv_bb = exp10.(Sv_bb / 10)
 Sv_nb = 10log10.(Σ_nb * N) .+ η_nb .* randn(length(freqs_nb))
-# sv_nb = sv_bb[i_nb]
+sv_nb = sv_bb[i_nb]
 exp10.(Sv_nb / 10)
 Sv_plot = 10log10.(Σ_plot * N)
 
-p2 = plot(freqs_plot, Sv_plot, color=:black, label="Theoretical",
+p2 = plot(freqs_plot, Sv_plot .- 20, color=:black, label="Theoretical",
     xlabel="Freq (kHz)", ylabel="Sv (dB re m⁻¹)", titlealign=:left, title="B)")
-scatter!(p2, freqs_bb, Sv_bb, marker=:o, label="Broadband", color=1)
-scatter!(p2, freqs_nb, Sv_nb, markersize=8, color=2, label="Narrowband")
+scatter!(p2, freqs_bb, Sv_bb .- 20, marker=:o, label="Broadband", color=1)
+scatter!(p2, freqs_nb, Sv_nb .- 20, markersize=8, color=2, label="Narrowband")
 plot(p1, p2, size=(800, 400), margin=10px)
 savefig(joinpath(@__DIR__, "plots/meso_mix_scenario_Sv.png"))
 
@@ -78,8 +79,8 @@ Setting up the different inference scenarios.
 T = Distribution{Univariate, Continuous}
 # μprior2 = max.(5N, 0.01)
 # prior2 = T[truncated(Normal(0, μ), 0, Inf) for μ in μprior2]
-μprior2 = max.(0.5N, 0.01)
-prior2 = T[Normal(log10.(μ), 1.0) for μ in μprior2]
+μprior2 = log10.(max.(1N, 0.01))
+prior2 = T[Normal(μ, 1.50) for μ in μprior2]
 
 # Add estimate of siphonophore density from ROV survey
 prior3 = copy(prior2)
@@ -110,17 +111,17 @@ scenarios = ["Acoustics\nonly", "+Video", "+eDNA", "Video\n+eDNA"]
     logn ~ arraydist(params.priors)
     n = exp10.(logn)
     sv_pred = Σbs * n
-    # ηsv = max.(cv .* sv_pred, sqrt(eps()))
-    # data.backscatter .~ Normal.(sv_pred, ηsv)
-    data.backscatter .~ Normal.(10log10.(sv_pred), cv)
+    ηsv = max.(cv .* sv_pred, sqrt(eps()))
+    data.backscatter .~ Normal.(sv_pred, ηsv)
+    # data.backscatter .~ Normal.(10log10.(sv_pred), cv)
 end
 
-data_bb = (backscatter=Sv_bb, freqs=freqs_bb, coords=(depth,))
-data_nb = (backscatter=Sv_nb, freqs=freqs_nb, coords=(depth,))
+data_bb = (backscatter=sv_bb, freqs=freqs_bb, coords=(depth,))
+data_nb = (backscatter=sv_nb, freqs=freqs_nb, coords=(depth,))
 
 
 # 5000 samples is overkill, done for nice plotting
-solver = MCMCSolver(sampler=NUTS(1000, 0.9), nchains=4, nsamples=2000)
+solver = MCMCSolver(sampler=NUTS(0.8), nchains=4, nsamples=500, kwargs=(progress=true,))
 chains = map(priors) do p
     params_nb = (TS = TS_nb, priors=p)
     params_bb = (TS = TS_bb, priors=p)
@@ -154,14 +155,15 @@ posteriors = @chain vcat(posteriors...) begin
 end
 
 
-yl = @by(posteriors, :scatterer, :q = quantile((:density), 0.98)).q
+yl = @by(posteriors, :scatterer, :q = quantile((:density), 0.99)).q
 # yl = [0.01, 0.75, 0.025, 10, 0.5] * 5
-yl = [.01, 0.5, 0.5, 10, 1]
+yl = [.01, 0.5, 0.2, 10, 0.3] * 100
 subplots = map(enumerate(unique(posteriors.scatterer))) do (i, scatterer)
     post = @subset(posteriors, :scatterer .== scatterer)
 
     prior_sample = [exp10.(rand(prior[i], 1_000)) for prior in priors]
-    p = violin(prior_sample, color=:grey, alpha=0.3, ylabel="Density (# m⁻³)", ylims=(0, yl[i]))
+    # p = violin(prior_sample, color=:grey, alpha=0.3, ylabel="Density (# m⁻³)", ylims=(0, yl[i]))
+    p = plot(ylabel="Density (# m⁻³)", ylims=(0, yl[i]))
     @df @subset(post, :bandwidth .== "Narrowband") violin!(p, :scenario, exp10.(:density), group=:scenario,
         color=2, side=:left, linewidth=0, legend=false, title=scatterer)
     @df @subset!(post, :bandwidth .== "Broadband") violin!(p, :scenario, exp10.(:density), side=:right, 
@@ -178,10 +180,33 @@ push!(subplots,
 plot(subplots..., size=(1200, 600), margin=5mm)
 savefig(joinpath(@__DIR__, "plots/meso_mix_posteriors.png"))
 
+p1 = density(Array(group(chains[1].nb, :logn)), fill=true, fillalpha=0.7, label=labels, 
+    legend=:topleft, title="Acoustics only")
+vline!(p1, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+p2 = density(Array(group(chains[2].nb, :logn)), fill=true, fillalpha=0.7, label="", title="+ Video")
+vline!(p2, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+p3 = density(Array(group(chains[3].nb, :logn)), fill=true, fillalpha=0.7, label="", title="+ eDNA")
+vline!(p3, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+p4 = density(Array(group(chains[4].nb, :logn)), fill=true, fillalpha=0.7, label="", title="+ Video/eDNA")
+vline!(p4, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+
+p5 = density(Array(group(chains[1].bb, :logn)), fill=true, fillalpha=0.7, label="")
+vline!(p5, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+p6 = density(Array(group(chains[2].bb, :logn)), fill=true, fillalpha=0.7, label="")
+vline!(p6, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+p7 = density(Array(group(chains[3].bb, :logn)), fill=true, fillalpha=0.7, label="")
+vline!(p7, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+p8 = density(Array(group(chains[4].bb, :logn)), fill=true, fillalpha=0.7, label="",)
+vline!(p8, log10.(N' .+1e-8), c=[1 2 3 5], label="")
+
+plot(p1, p2, p3, p4, p5, p6, p7, p8, layout=(2, 4), xlims=(-6, 3), fill=true, fillalpha=0.7,
+    ylims=(0, 4))
+
+
 
 plot(
-    corrplot(exp.(Array(group(chains[1].bb, :logn)))),
-    corrplot(exp.(Array(group(chains[3].bb, :logn)))),
+    corrplot(exp.(Array(group(chains[1].nb, :logn)))),
+    corrplot(exp.(Array(group(chains[3].nb, :logn)))),
     size=(1500, 500)
 )
 
