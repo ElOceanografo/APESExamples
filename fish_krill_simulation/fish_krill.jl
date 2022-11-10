@@ -7,7 +7,7 @@ using DataFrames, DataFramesMeta
 
 include(joinpath(@__DIR__, "../src/bubbles.jl"))
 
-Random.seed!(12345)
+Random.seed!(123)
 
 freqs_bb = [15:25; 35:38; 50:87; 100:150; 170:240]
 freqs_nb = [18, 38, 70, 120, 200]
@@ -19,38 +19,38 @@ a = 0.0005
 δ = 0.3
 fish = Bubble(a, depth=depth, δ=δ)
 krill = resize(Models.krill_mcgeehee, 0.025)
+# EBS/GOA average values from Lucca et al. 2021
+krill.g .= 1.019
+krill.h .= 1.032
 
 ts_fish(freq) = target_strength(fish, freq*1e3)
 ts_krill(freq) = target_strength(krill, freq*1e3, 1470)
 
-η = 3
 TS_sim = [ts_fish.(freqs_bb) ts_krill.(freqs_bb)]#
 Σ_sim = exp10.(TS_sim / 10)
 TS_plot = [ts_fish.(freqs_plot) ts_krill.(freqs_plot)]
 Σ_plot = exp10.(TS_plot / 10)
 
 tsplot = plot(freqs_plot, TS_plot, label=["Fish" "Krill"], legend=:bottomright,
-    xlabel="Frequency (kHz)", ylabel="TS (dB)");
+    xlabel="Frequency (kHz)", ylabel="TS (dB re. m⁻¹)");
 vline!(tsplot, freqs_nb, linestyle=:dot, color=:black, label="");
 scatter!(tsplot, freqs_bb, TS_sim, color=[1 2], label="", markerstrokewidth=0)
 
 N1 = [0.001, 1e3]
 N2 = [0.2, 4e2]
-N3 = [0.5, 20]
+N3 = [0.5, 10]
 
 scenarios = [N1, N2, N3]
 
 svs = map(scenarios) do N
-    mean(exp10.((TS_sim .+ η * randn(length(freqs_bb))) / 10) * N 
-        for _ in 1:5)
-    # TS = TS_sim .+ η * randn(length(freqs_bb))
-    # Σ = exp10.(TS / 10)
-    # return Σ * N
+    TS = TS_sim
+    Σ = exp10.(TS_sim / 10)
+    sv_pred = Σ * N
+    σ = sv_pred / sqrt(π/2) # convert mean sv to Rayleigh parameter σ
+    # 
+    return mean(rand.(Rayleigh.(σ)) for _ in 1:3)
 end
 Svs = [10log10.(sv) for sv in svs]
-# Svs = [mean(10log10.(Σ_sim * N) .+ η * randn(length(freqs_bb)) for i in 1:20)
-#     for N in scenarios]
-# svs = [exp10.(Sv ./ 10) for Sv in Svs]
 svs_nb = [sv[i_nb] for sv in svs]
 Svs_nb = [Sv[i_nb] for Sv in Svs]
 
@@ -66,8 +66,8 @@ scatter!(svplot, freqs_nb, Svs_nb, color=pal, markershape=[:circle :square :utri
 plot(tsplot, svplot, size=(1000, 400), margin=20px)
 savefig(joinpath(@__DIR__, "plots/fish_krill_Sv.png"))
 
-data_bb = [(backscatter=sv, freqs=freqs_bb, coords=(depth,))
-    for sv in svs]
+data_bb = [(backscatter=Sv, freqs=freqs_bb, coords=(depth,))
+    for Sv in Svs]
 data_nb = [(backscatter=data.backscatter[i_nb], freqs=freqs_bb[i_nb], coords=(depth,))
     for data in data_bb]
 
@@ -78,23 +78,20 @@ params_nb = (TS_const = ts_krill.(freqs_nb), δ = δ, μprior=μprior)
 
 @model function echomodel(data, params)
     depth = data.coords[end]
-    a ~ truncated(Normal(5e-4, 2e-4), 0.0001, 0.0015)
+    a ~ truncated(Normal(5e-4, 3.5e-4), 0.0001, 0.001)
     b = Bubble(a, depth=data.coords[1], δ=params.δ)
     TS_fish = map(f -> target_strength(b, f.*1e3), data.freqs)
     TS = [TS_fish params.TS_const]
     Σbs = exp10.(TS ./ 10)
-
     logn ~ arraydist(Normal.(log10.(params.μprior), 2.0))
     n = exp10.(logn)
-    sv_pred = Σbs * n
-    cv ~ Exponential(1.0)
-    ηsv = max.(cv * data.backscatter, sqrt(eps(eltype(data.backscatter))))
-    data.backscatter .~ Normal.(sv_pred, ηsv)
-
+    Sv_pred = 10log10.(Σbs * n)
+    ϵ ~ Exponential(1.0)
+    data.backscatter .~ Normal.(Sv_pred, ϵ)
     return 10log10.(Σ_plot * n)
 end
 
-solver = MCMCSolver(sampler=NUTS(0.8), nchains=4)
+solver = MCMCSolver(sampler=NUTS(0.8), nchains=4, nsamples=2500)
 
 chains = map(zip(data_nb, data_bb)) do data
     sv_nb, sv_bb = data
@@ -117,22 +114,22 @@ for i in 1:3
 end
 
 titles = ["Krill-dominated", "Mixture", "Fish-dominated"]
-xlimits = [[1e-6, 0.5], [1e-6, 0.5], [1e-6, 1]]
-ylimits = [[0, 1500], [0, 1000], [0, 100]]
+xlimits = [[1e-6, 1], [1e-6, 1], [1e-6, 1]]
+ylimits = [[0, 2000], [0, 2000], [0, 200]]
 post_plots = map(enumerate(chains)) do (i, chn)
     a_nb = reshape(chn.nb[:a], :, 1)
-    n_nb = exp10.(reshape(Array(group(chn.nb, :logn)), :, 2))
+    n_nb = exp10.(reshape(Array(group(chn.nb, :logn)), :, 2)) 
     a_bb = reshape(chn.bb[:a], :, 1)
-    n_bb = exp10.(reshape(Array(group(chn.bb, :logn)), :, 2))
+    n_bb = exp10.(reshape(Array(group(chn.bb, :logn)), :, 2)) 
 
-    a_plot = plot(truncated(Normal(0.5, 0.4), 0.01, 1.5), 
+    a_plot = plot(truncated(Normal(0.5, 0.35), 0.01, 1.5), 
         fill=(0, "#aaaaaa"), color="#aaaaaa", label="Prior")
     density!(a_plot, 1e3*a_nb, fill=true, alpha=0.75, label="Narrowband",
         xlabel="ESR (mm)", ylabel="PDF", title=titles[i], color=1,
         legend = i==3 ? :topright : :none)
     density!(a_plot, 1e3*a_bb, fill=true, alpha=0.75, label="Broadband", color=2)
     vline!(a_plot, [1e3*a], color=:black, linestyle=:dot, label="")
-    ylims!(a_plot, (0, 27))
+    ylims!(a_plot, (0, 15))
 
     ff =  range(xlimits[i]..., length=100)
     kk =  range(ylimits[i]..., length=100)
@@ -181,12 +178,26 @@ comparison = @chain df begin
     @transform(:rel_error = :error ./ :ntrue)
 end
 
+rhats = map(enumerate(chains)) do tup
+    i, chns = tup
+    df_nb = chns.nb |> ess_rhat |> DataFrame |> df -> unstack(df[:, [:parameters, :rhat]], :parameters, :rhat)
+    df_nb[!, :bandwidth] .= "Narrowband"
+    df_bb = chns.bb |> ess_rhat |> DataFrame |> df -> unstack(df[:, [:parameters, :rhat]], :parameters, :rhat)
+    df_bb[!, :bandwidth] .= "Broadband"
+    [df_nb; df_bb]
+end
+rhats = vcat(rhats...)
+
+ppreds = map(1:3) do i
+    generated_quantities(echomodel(data_bb[i], params_bb), chains[i].bb) |> vec
+end
 for i in 1:3
-    ppred = generated_quantities(echomodel(data_bb[i], params_bb), chains[i].bb) |> vec
-    # ηpred = vec(chains[i].bb[:cv]) .* ppred
-    # ppred = [ppred[i] .+ ηpred[i] ./ sqrt(5) .* randn(length(ppred[i])) for i in 1:length(ppred)]
-    plot(freqs_plot, ppred[1:10:end], label="",  color=:black, alpha=0.1)
-    # scatter!(data_bb[i].freqs, 10log10.(data_bb[i].backscatter), color=1, label="Data")
-    plot!(freqs_plot, Svs_plot[i], color=2, label="Truth")
+    ppred = ppreds[i]
+    scatter(data_bb[i].freqs, data_bb[i].backscatter, markerstrokewidth=0, markersize=2, 
+        color=:black, label="Data", legend=:bottomright)
+    plot!(freqs_plot, quantile(ppred, 0.025), fillrange=quantile(ppred, 0.975), color=1, alpha=0.5, 
+        label="Posterior predictions\nmean and 95% interval")
+    plot!(freqs_plot, mean(ppred), color=1, linewidth=2, label="")
+    plot!(freqs_plot, Svs_plot[i], color=2, linewidth=2, label="Truth")
     savefig(joinpath(@__DIR__, "plots/posterior_$(i)_predictive.png"))
 end
