@@ -20,8 +20,8 @@ depth = 300.0
 freqs_hake = [18, 38, 70, 120, 200]
 TS_hake = [-34.6, -35.0, -35.6, -36.6, -38.5]
 spline_hake = Spline1D(freqs_hake, TS_hake)
-b_myctophid = Bubble(0.00065, depth=depth, δ=0.4)
-b_siphonophore = Bubble(0.00055, depth=depth, δ=0.2)
+b_myctophid = Bubble(0.00065, depth=depth, δ=0.3)
+b_siphonophore = Bubble(0.00058, depth=depth, δ=0.2)
 sergestid = resize(Models.krill_mcgeehee, 0.045)
 freqs_squid = [5,    18,  38,   70,    90,   120,   150, 200] .+ 5
 TS_squid = [-45, -33, -34.7, -36.5, -37., -37.25, -37.4, -37.5] .+ 10log10(0.2^2)
@@ -53,15 +53,13 @@ scatter!(p1, freqs_bb, TS_bb, label="", color=pal, markerstrokewidth=0)
 vline!(p1, freqs_nb, linestyle=:dot, color=:grey, label="")
 
 
-Random.seed!(1234)
-η_bb = 1
-η_nb = 1
+Random.seed!(123)
 N = [0.25, 10, 0.0, 170, 7] # density (per 100 m³, divide by 100 to get m⁻³).  No squid.
-Sv_bb = 10log10.(Σ_bb * N) .+ η_bb .* randn(length(freqs_bb))
-sv_bb = exp10.(Sv_bb / 10)
-Sv_nb = 10log10.(Σ_nb * N) .+ η_nb .* randn(length(freqs_nb))
+
+sv_bb = mean(rand.(Rayleigh.(Σ_bb * N / sqrt(π/2))) for _ in 1:10)
+Sv_bb = 10log10.(sv_bb)
 sv_nb = sv_bb[i_nb]
-exp10.(Sv_nb / 10)
+Sv_nb = Sv_bb[i_nb]
 Sv_plot = 10log10.(Σ_plot * N)
 
 p2 = plot(freqs_plot, Sv_plot .- 20, color=:black, label="Theoretical",
@@ -79,52 +77,44 @@ Setting up the different inference scenarios.
 T = Distribution{Univariate, Continuous}
 # μprior2 = max.(5N, 0.01)
 # prior2 = T[truncated(Normal(0, μ), 0, Inf) for μ in μprior2]
-μprior2 = log10.(max.(1N, 0.01))
-prior2 = T[Normal(μ, 1.50) for μ in μprior2]
+μprior1 = log10.(max.(N, 0.25))
+prior1 = T[Normal(μ, 2.0) for μ in μprior1]
 
-# Add estimate of siphonophore density from ROV survey
-prior3 = copy(prior2)
-# prior3[5] = truncated(Normal(N[5], 0.1N[5]), 0, Inf)
-prior3[5] = Normal(log10.(N[5]), 0.06)
+# Add estimate of sergestid and siphonophore density from ROV survey
+prior2 = copy(prior1)
+prior2[4] = Normal(log10(N[4]), 0.06)
+prior2[5] = Normal(log10.(N[5]), 0.06)
 
-## Add estimates of sergestid density from ROV survey
-prior4 = copy(prior3)
-# prior4[4] = truncated(Normal(N[4], 0.1N[4]), 0, Inf)
-prior4[4] = Normal(log10(N[4]), 0.06)
+# Did eDNA sampling, found no squid
+prior3 = copy(prior1)
+prior3[3] = Normal(log10(1e-9), 0.01)
 
-## Did eDNA sampling, found no squid
-prior5 = copy(prior4)
-# prior5[3] = Uniform(0, 1e-9)
-prior5[3] = Normal(log10(1e-9), 0.01)
+# Video and eDNA sampling
+prior4 = copy(prior2)
+prior4[3] = Normal(log10(1e-9), 0.01)
 
-## Case where *only* did eDNA sampling, so absence of squid is only other info available
-prior6 = copy(prior2)
-# prior6[3] = Uniform(0, 1e-9)
-prior6[3] = Normal(log10(1e-9), 0.01)
-
-priors = [prior2, prior4, prior6, prior5]
+priors = [prior1, prior2, prior3, prior4]
 scenarios = ["Acoustics\nonly", "+Video", "+eDNA", "Video\n+eDNA"]
 
 @model function echomodel(data, params)
     Σbs = exp10.(params.TS ./ 10) # convert TS to σbs
-    cv ~ Exponential(1.0)
+    ϵ ~ Exponential(1.0)
     logn ~ arraydist(params.priors)
     n = exp10.(logn)
-    sv_pred = Σbs * n
-    ηsv = max.(cv .* sv_pred, sqrt(eps()))
-    data.backscatter .~ Normal.(sv_pred, ηsv)
-    # data.backscatter .~ Normal.(10log10.(sv_pred), cv)
+    Sv_pred = 10log10.(Σbs * n)
+    data.backscatter .~ Normal.(Sv_pred, ϵ)
+    return 10log10.(params.Σ_plot * n) .+ ϵ .* randn(size(params.Σ_plot, 1))
 end
 
-data_bb = (backscatter=sv_bb, freqs=freqs_bb, coords=(depth,))
-data_nb = (backscatter=sv_nb, freqs=freqs_nb, coords=(depth,))
+data_bb = (backscatter=Sv_bb, freqs=freqs_bb, coords=(depth,))
+data_nb = (backscatter=Sv_nb, freqs=freqs_nb, coords=(depth,))
 
 
-# 5000 samples is overkill, done for nice plotting
-solver = MCMCSolver(sampler=NUTS(0.8), nchains=4, nsamples=500, kwargs=(progress=true,))
+# 10,00 samples is overkill, done for nice plotting
+solver = MCMCSolver(sampler=NUTS(0.9), nchains=4, nsamples=2500, kwargs=(progress=true,))
 chains = map(priors) do p
-    params_nb = (TS = TS_nb, priors=p)
-    params_bb = (TS = TS_bb, priors=p)
+    params_nb = (TS = TS_nb, priors=p, Σ_plot = Σ_plot)
+    params_bb = (TS = TS_bb, priors=p, Σ_plot = Σ_plot)
     chain_nb = solve(data_nb, echomodel, solver, params_nb)
     chain_bb = solve(data_bb, echomodel, solver, params_bb)
     return (nb = chain_nb, bb = chain_bb)
@@ -155,22 +145,17 @@ posteriors = @chain vcat(posteriors...) begin
 end
 
 
-yl = @by(posteriors, :scatterer, :q = quantile((:density), 0.99)).q
-# yl = [0.01, 0.75, 0.025, 10, 0.5] * 5
-yl = [.01, 0.5, 0.2, 10, 0.3] * 100
+yl = [quantile((df.density), [0.01, 1]) for df in groupby(posteriors, :scatterer)]
+
 subplots = map(enumerate(unique(posteriors.scatterer))) do (i, scatterer)
     post = @subset(posteriors, :scatterer .== scatterer)
-
-    prior_sample = [exp10.(rand(prior[i], 1_000)) for prior in priors]
-    # p = violin(prior_sample, color=:grey, alpha=0.3, ylabel="Density (# m⁻³)", ylims=(0, yl[i]))
-    p = plot(ylabel="Density (# m⁻³)", ylims=(0, yl[i]))
-    @df @subset(post, :bandwidth .== "Narrowband") violin!(p, :scenario, exp10.(:density), group=:scenario,
+    prior_sample = [rand(prior[i], 10_000) for prior in priors]
+    p = violin(prior_sample, color=:grey, alpha=0.3, ylabel="Density (# m⁻³)", ylims=yl[i])
+    @df @subset(post, :bandwidth .== "Narrowband") violin!(p, :scenario, :density, group=:scenario,
         color=2, side=:left, linewidth=0, legend=false, title=scatterer)
-    @df @subset!(post, :bandwidth .== "Broadband") violin!(p, :scenario, exp10.(:density), side=:right, 
+    @df @subset!(post, :bandwidth .== "Broadband") violin!(p, :scenario, :density, side=:right, 
         linewidth=0, color=1)
-    hline!(p, [(N[i])], color=:black, linestyle=:dash, label="")
-    
-    # ylims!(p, 0, yl[i])
+    hline!(p, [log10(N[i])], color=:black, linestyle=:dash, linewidth=2, label="")
     return p
 end
 push!(subplots,
@@ -180,39 +165,33 @@ push!(subplots,
 plot(subplots..., size=(1200, 600), margin=5mm)
 savefig(joinpath(@__DIR__, "plots/meso_mix_posteriors.png"))
 
-p1 = density(Array(group(chains[1].nb, :logn)), fill=true, fillalpha=0.7, label=labels, 
-    legend=:topleft, title="Acoustics only")
-vline!(p1, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-p2 = density(Array(group(chains[2].nb, :logn)), fill=true, fillalpha=0.7, label="", title="+ Video")
-vline!(p2, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-p3 = density(Array(group(chains[3].nb, :logn)), fill=true, fillalpha=0.7, label="", title="+ eDNA")
-vline!(p3, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-p4 = density(Array(group(chains[4].nb, :logn)), fill=true, fillalpha=0.7, label="", title="+ Video/eDNA")
-vline!(p4, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-
-p5 = density(Array(group(chains[1].bb, :logn)), fill=true, fillalpha=0.7, label="")
-vline!(p5, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-p6 = density(Array(group(chains[2].bb, :logn)), fill=true, fillalpha=0.7, label="")
-vline!(p6, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-p7 = density(Array(group(chains[3].bb, :logn)), fill=true, fillalpha=0.7, label="")
-vline!(p7, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-p8 = density(Array(group(chains[4].bb, :logn)), fill=true, fillalpha=0.7, label="",)
-vline!(p8, log10.(N' .+1e-8), c=[1 2 3 5], label="")
-
-plot(p1, p2, p3, p4, p5, p6, p7, p8, layout=(2, 4), xlims=(-6, 3), fill=true, fillalpha=0.7,
-    ylims=(0, 4))
-
-
-
 plot(
     corrplot(exp.(Array(group(chains[1].nb, :logn)))),
-    corrplot(exp.(Array(group(chains[3].nb, :logn)))),
+    corrplot(Array(group(chains[3].nb, :logn))),
     size=(1500, 500)
 )
 
-(mean(Array(group(chains[4].nb, :n)), dims=1) .- N') ./ N'
-(mean(Array(group(chains[4].bb, :n)), dims=1) .- N') ./ N'
 
-sqrt.(mean((Array(group(chains[4].nb, :n)) .- N').^2, dims=1)) ./ N'
-sqrt.(mean((Array(group(chains[4].bb, :n)) .- N').^2, dims=1)) ./ N'
+ppreds = map(1:4) do i
+    params_nb = (TS = TS_nb, priors=priors[i], Σ_plot=Σ_plot)
+    params_bb = (TS = TS_bb, priors=priors[i], Σ_plot=Σ_plot)
+    (bb = generated_quantities(echomodel(data_bb, params_bb), chains[i].bb) |> vec,
+     nb = generated_quantities(echomodel(data_nb, params_nb), chains[i].nb) |> vec)
+end
 
+post_pred_plots = map(1:4) do i
+    p = scatter(freqs_bb, Sv_bb, markersize=2, color=:black, 
+        xlabel="Frequency (kHz)", ylabel="Sᵥ (dB re m⁻¹)",
+        title=scenarios[i], label="Data", legend=:bottomright)
+    plot!(p, freqs_plot, vec(mapslices(x -> quantile(x, 0.025), hcat(ppreds[i].nb...), dims=2)),
+        fillrange=vec(mapslices(x -> quantile(x, 0.975), hcat(ppreds[i].nb...), dims=2)),
+        alpha=0.5, color=2, label="")
+    plot!(p, freqs_plot, mean(ppreds[1].nb), color=2, label="Narrowband")
+    plot!(p, freqs_plot, vec(mapslices(x -> quantile(x, 0.025), hcat(ppreds[i].bb...), dims=2)),
+        fillrange=vec(mapslices(x -> quantile(x, 0.975), hcat(ppreds[i].bb...), dims=2)),
+        alpha=0.5, color=1, label="")
+    plot!(p, freqs_plot, mean(ppreds[1].bb), color=1, label="Broadband")
+    return p
+end
+plot(post_pred_plots..., size=(800, 500))
+savefig(joinpath(@__DIR__, "plots/posterior_predictive.png"))
