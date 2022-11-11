@@ -88,10 +88,10 @@ params_nb = (TS_const = ts_krill.(freqs_nb), δ = δ, μprior=μprior)
     Sv_pred = 10log10.(Σbs * n)
     ϵ ~ Exponential(1.0)
     data.backscatter .~ Normal.(Sv_pred, ϵ)
-    return 10log10.(Σ_plot * n)
+    return 10log10.(Σ_plot * n) .+ ϵ .* randn(size(Σ_plot, 1))
 end
 
-solver = MCMCSolver(sampler=NUTS(0.8), nchains=4, nsamples=2500)
+solver = MCMCSolver(sampler=NUTS(0.8), nchains=4, nsamples=2500, kwargs=(progress=true,))
 
 chains = map(zip(data_nb, data_bb)) do data
     sv_nb, sv_bb = data
@@ -189,15 +189,22 @@ end
 rhats = vcat(rhats...)
 
 ppreds = map(1:3) do i
-    generated_quantities(echomodel(data_bb[i], params_bb), chains[i].bb) |> vec
+    (bb = generated_quantities(echomodel(data_bb[i], params_bb), chains[i].bb) |> vec,
+     nb = generated_quantities(echomodel(data_nb[i], params_nb), chains[i].nb) |> vec)
 end
-for i in 1:3
-    ppred = ppreds[i]
-    scatter(data_bb[i].freqs, data_bb[i].backscatter, markerstrokewidth=0, markersize=2, 
-        color=:black, label="Data", legend=:bottomright)
-    plot!(freqs_plot, quantile(ppred, 0.025), fillrange=quantile(ppred, 0.975), color=1, alpha=0.5, 
-        label="Posterior predictions\nmean and 95% interval")
-    plot!(freqs_plot, mean(ppred), color=1, linewidth=2, label="")
-    plot!(freqs_plot, Svs_plot[i], color=2, linewidth=2, label="Truth")
-    savefig(joinpath(@__DIR__, "plots/posterior_$(i)_predictive.png"))
+post_pred_plots = map(1:3) do i
+    p = scatter(freqs_bb, Svs[i], markersize=2, color=:black, 
+        xlabel="Frequency (kHz)", ylabel="Sᵥ (dB re m⁻¹)",
+        title=titles[i], label="Data", legend=:bottomright)
+    plot!(p, freqs_plot, vec(mapslices(x -> quantile(x, 0.025), hcat(ppreds[i].nb...), dims=2)),
+        fillrange=vec(mapslices(x -> quantile(x, 0.975), hcat(ppreds[i].nb...), dims=2)),
+        alpha=0.5, color=2, label="")
+    plot!(p, freqs_plot, mean(ppreds[i].nb), color=2, label="Narrowband")
+    plot!(p, freqs_plot, vec(mapslices(x -> quantile(x, 0.025), hcat(ppreds[i].bb...), dims=2)),
+        fillrange=vec(mapslices(x -> quantile(x, 0.975), hcat(ppreds[i].bb...), dims=2)),
+        alpha=0.5, color=1, label="")
+    plot!(p, freqs_plot, mean(ppreds[i].bb), color=1, label="Broadband")
+    return p
 end
+plot(post_pred_plots..., size=(800, 500))
+savefig(joinpath(@__DIR__, "plots/posterior_predictive.png"))
