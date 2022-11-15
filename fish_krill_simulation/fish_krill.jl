@@ -198,12 +198,12 @@ post_pred_plots = map(1:3) do i
         title=titles[i], label="Data", legend=:bottomright)
     plot!(p, freqs_plot, vec(mapslices(x -> quantile(x, 0.025), hcat(ppreds[i].nb...), dims=2)),
         fillrange=vec(mapslices(x -> quantile(x, 0.975), hcat(ppreds[i].nb...), dims=2)),
-        alpha=0.5, color=2, label="")
-    plot!(p, freqs_plot, mean(ppreds[i].nb), color=2, label="Narrowband")
+        alpha=0.5, color=1, label="")
+    plot!(p, freqs_plot, mean(ppreds[i].nb), color=1, label="Narrowband")
     plot!(p, freqs_plot, vec(mapslices(x -> quantile(x, 0.025), hcat(ppreds[i].bb...), dims=2)),
         fillrange=vec(mapslices(x -> quantile(x, 0.975), hcat(ppreds[i].bb...), dims=2)),
-        alpha=0.5, color=1, label="")
-    plot!(p, freqs_plot, mean(ppreds[i].bb), color=1, label="Broadband")
+        alpha=0.5, color=2, label="")
+    plot!(p, freqs_plot, mean(ppreds[i].bb), color=2, label="Broadband")
     return p
 end
 plot(post_pred_plots..., size=(800, 500))
