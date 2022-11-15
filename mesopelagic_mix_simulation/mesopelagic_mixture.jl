@@ -54,7 +54,7 @@ vline!(p1, freqs_nb, linestyle=:dot, color=:grey, label="")
 
 
 Random.seed!(123)
-N = [0.25, 10, 0.0, 170, 7] # density (per 100 m³, divide by 100 to get m⁻³).  No squid.
+N = [0.25, 10, 0.0, 170, 7] / 100 # density (per 100 m³, divided by 100 to get m⁻³).  No squid.
 
 sv_bb = mean(rand.(Rayleigh.(Σ_bb * N / sqrt(π/2))) for _ in 1:10)
 Sv_bb = 10log10.(sv_bb)
@@ -77,7 +77,7 @@ Setting up the different inference scenarios.
 T = Distribution{Univariate, Continuous}
 # μprior2 = max.(5N, 0.01)
 # prior2 = T[truncated(Normal(0, μ), 0, Inf) for μ in μprior2]
-μprior1 = log10.(max.(N, 0.25))
+μprior1 = log10.(max.(N, 0.0025))
 prior1 = T[Normal(μ, 2.0) for μ in μprior1]
 
 # Add estimate of sergestid and siphonophore density from ROV survey
@@ -94,7 +94,7 @@ prior4 = copy(prior2)
 prior4[3] = Normal(log10(1e-9), 0.01)
 
 priors = [prior1, prior2, prior3, prior4]
-scenarios = ["Acoustics\nonly", "+Video", "+eDNA", "Video\n+eDNA"]
+scenarios = ["Acoustics\nonly", "Video", "eDNA", "Video\n+eDNA"]
 
 @model function echomodel(data, params)
     Σbs = exp10.(params.TS ./ 10) # convert TS to σbs
@@ -138,7 +138,6 @@ posteriors = map(enumerate(chains)) do (i, chn)
     df[!, :scenario] .= scenarios[i]
     return df
 end
-
 posteriors = @chain vcat(posteriors...) begin
     DataFrames.stack( Not([:scenario, :bandwidth]), variable_name=:scatterer, value_name=:density)
     @transform(:scenario = CategoricalArray(:scenario, levels=scenarios, ordered=true))
@@ -150,7 +149,7 @@ yl = [quantile((df.density), [0.01, 1]) for df in groupby(posteriors, :scatterer
 subplots = map(enumerate(unique(posteriors.scatterer))) do (i, scatterer)
     post = @subset(posteriors, :scatterer .== scatterer)
     prior_sample = [rand(prior[i], 10_000) for prior in priors]
-    p = violin(prior_sample, color=:grey, alpha=0.3, ylabel="Density (# m⁻³)", ylims=yl[i])
+    p = violin(prior_sample, color=:grey, alpha=0.3, ylabel="log₁₀(# m⁻³)", ylims=yl[i])
     @df @subset(post, :bandwidth .== "Narrowband") violin!(p, :scenario, :density, group=:scenario,
         color=2, side=:left, linewidth=0, legend=false, title=scatterer)
     @df @subset!(post, :bandwidth .== "Broadband") violin!(p, :scenario, :density, side=:right, 
@@ -162,7 +161,7 @@ push!(subplots,
     plot(ones(1,3), labels=["Prior" "Narrowband" "Broadband"], linewidth=10,
          color=[:grey 2 1], legend=:left, xaxis=false, xticks=false,
          yaxis=false, yticks=false, ylabel="", legend_font_pointsize=10))
-plot(subplots..., size=(1200, 600), margin=5mm)
+plot(subplots..., size=(1000, 550), margin=5mm)
 savefig(joinpath(@__DIR__, "plots/meso_mix_posteriors.png"))
 
 plot(
