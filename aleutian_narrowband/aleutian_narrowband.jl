@@ -8,7 +8,6 @@ using StatsBase
     using Optim
     using Random
     using SDWBA
-    # using Dierckx
     using LinearAlgebra
     using Plots, StatsPlots, Plots.PlotMeasures
     using DataFrames, DataFramesMeta, CategoricalArrays
@@ -110,7 +109,7 @@ savefig(joinpath(@__DIR__, "plots/echograms.png"))
         a ~ Uniform(1e-5, 2e-3)
         δ = 0.5
         bubble = Bubble(a, depth=data.coords[1], δ=δ)
-        TS_bubble = [target_strength(bubble, f*1e3) for f in freqs]
+        TS_bubble = [target_strength(bubble, f*1e3) for f in data.freqs]
         TS = [params.TS TS_bubble]
         Σ = exp10.(TS ./ 10)
         logn ~ arraydist(params.prior)

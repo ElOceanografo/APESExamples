@@ -1,10 +1,12 @@
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
 DimensionalData = "0703355e-b756-11e9-17c0-8b28908087d0"
+MAT = "23992714-dd62-5051-b70f-ba57cb901cac"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 ProbabilisticEchoInversion = "1f6a33d4-8dbe-4644-aee6-8f897f240d65"
