@@ -1,5 +1,5 @@
 using Distributed
-addprocs(8, topology=:master_worker, exeflags="--project=$(Base.active_project())")
+addprocs(topology=:master_worker, exeflags="--project=$(Base.active_project())")
 using CSV
 using StatsBase
 @everywhere begin
@@ -159,7 +159,7 @@ thresh_mask = fmissing.(solution_mcmc, chn -> mean(chn[Symbol("logn[4]")]) .> -6
 p1 = heatmap(fmissing.(solution_mcmc, chn -> mean(1e3chn[:a])) .* thresh_mask, yflip=true, 
     c=cgrad(:hawaii, rev=true), clims=(0.2, 1.2), 
     colorbar_title="Bubble radius (mm)", size=(600, 350))
-    plot!(p1, distances, depths, b, yflip=true, aspect_ratio=0.04, xlims=(0, 18), ylims=(5, 400))
+plot!(p1, distances, depths, b, yflip=true, aspect_ratio=0.04, xlims=(0, 18), ylims=(5, 400))
 annotate!(p1, annotation_x, annotation_y, annotation_text)
 
 p2 = heatmap(fmissing.(solution_mcmc, chn -> std(1e3chn[:a])) .* thresh_mask, yflip=true, c=:viridis,
