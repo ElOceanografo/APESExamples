@@ -6,7 +6,7 @@ from "What, how many, and how sure? A practical Bayesian inverse approach to ide
 
 To run the example problems, you will need to [install Julia](https://julialang.org/downloads/) (v1.8 or higher) and run it in this directory. This project includes a self-contained environment for reproducibility. To install all packages at the version used for the publication, type `]` at the Julia command line to enter package-manager mode. The prompt should change from `julia>` to `(@v1.8) pkg>`. From here, run the following commands to activate the APESExamples environment and download all required packages.
 
-```julia
+```
 (@v1.8) pkg> activate .
   Activating project at <wherever you saved the repository>
 
