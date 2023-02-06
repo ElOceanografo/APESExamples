@@ -82,7 +82,8 @@ plot!(distances, depths, b, yflip=true, aspect_ratio=0.03, xlims=(0, 18), ylims=
 
 annotation_x = [16,  5,   9,    12,  10]
 annotation_y = [40,  30,  90,  220, 290]
-annotation_text = text.(["A", "B", "C",  "D", "E"], color=:white, 12)
+# annotation_text = text.(["A", "B", "C",  "D", "E"], color=:white, 12)
+annotation_text = text.(["I", "II", "III",  "IV", "V"], color=:white, 12)
 
 sv_plots = map(freqs) do f
     if f == 200
@@ -97,6 +98,7 @@ sv_plots = map(freqs) do f
         # background_color_inside="#333333",
         topmargin=0px, bottommargin=0px, colorbar_title="Sᵥ ($(f) kHz)") 
     annotate!(p, annotation_x, annotation_y, annotation_text)
+    # annotate!(p, 15, 300, string(f) * " kHz")
     plot!(distances, depths, b, yflip=true, aspect_ratio=0.01, xlims=(0, 18), ylims=(10, 400))
 end
 plot(sv_plots..., layout=(5, 1), size=(800, 900), leftmargin=20px)
@@ -155,15 +157,15 @@ heatmap(fmissing.(solution_map, x -> coef(x)[Symbol("logn[2]")]), yflip=true,
 solver_mcmc = MCMCSolver(verbose=false, nsamples=1000, nchains=4)
 solution_mcmc = apes(Sv, echomodel, solver_mcmc, params=pars, distributed=true)
 
-thresh_mask = fmissing.(solution_mcmc, chn -> mean(chn[Symbol("logn[4]")]) .> -6 ? 1.0 : missing)
+thresh_mask = fmissing.(solution_mcmc, chn -> mean(chn[Symbol("logn[4]")]) .> -5 ? 1.0 : missing)
 p1 = heatmap(fmissing.(solution_mcmc, chn -> mean(1e3chn[:a])) .* thresh_mask, yflip=true, 
-    c=cgrad(:hawaii, rev=true), clims=(0.2, 1.2), 
+    c=cgrad(:hawaii, rev=true), clims=(0.2, 1.2), title="A", titlealign=:left,
     colorbar_title="Bubble radius (mm)", size=(600, 350))
 plot!(p1, distances, depths, b, yflip=true, aspect_ratio=0.04, xlims=(0, 18), ylims=(5, 400))
 annotate!(p1, annotation_x, annotation_y, annotation_text)
 
 p2 = heatmap(fmissing.(solution_mcmc, chn -> std(1e3chn[:a])) .* thresh_mask, yflip=true, c=:viridis,
-    colorbar_title="Bubble radius C.V.")
+    colorbar_title="Bubble radius C.V.", title="B", titlealign=:left)
 plot!(p2, distances, depths, b, yflip=true, aspect_ratio=0.04, xlims=(0, 18), ylims=(5, 400))
 annotate!(p2, annotation_x, annotation_y, annotation_text)
 plot(p1, p2, size=(1000, 350), margin=15px)
@@ -173,11 +175,11 @@ savefig(joinpath(@__DIR__, "plots/bubble_esr.png"))
 meanplots = map(1:4) do i
     μ = fmissing.(solution_mcmc, chn -> mean(chn[Symbol("logn[$(i)]")]))
     ul = quantile(skipmissing(vec(μ)), 0.999)
-    ll = ul - 4
+    ll = ul - 3
     cl = (ll, ul)
     xticks = i == 4 ? true : false
     xlabel = i == 4 ? "Distance (km)" : ""
-    p = heatmap(μ, colorbartitle="log₁₀($(labels[i]) m⁻³)", yflip=true,
+    p = heatmap(μ, colorbartitle="log₁₀($(labels[i]) m⁻³)", yflip=true, title=['A':'D';][i], titlealign=:left,
         xlabel=xlabel, xticks=xticks, clims=cl, background_color_inside="#888888")
     annotate!(p, annotation_x, annotation_y, annotation_text)
     return p
@@ -197,7 +199,7 @@ end
 plot(
     plot(meanplots..., layout=(4, 1)),
     plot(cvplots..., layout=(4, 1)),
-    layout=(1, 2), size=(1200, 1000), margin=15px
+    layout=(1, 2), size=(1200, 1000), leftmargin=15px
 ) 
 savefig(joinpath(@__DIR__, "plots/posteriors.png"))
 

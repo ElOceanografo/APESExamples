@@ -123,9 +123,9 @@ end
 # MCMC diagnostic plots
 for (i, chn) in enumerate(chains)
     for bandwidth in [:nb, :bb]
-        p = plot(chn[bandwidth])
+        p = plot(chn[bandwidth], margin=20px)
         str = replace.(scenarios, "\n" => "_")[i]
-        savefig(joinpath(@__DIR__, "plots/diagnostic_posterior_$(bandwidth)_scenario_$(i)_$(str).png"))
+        savefig(joinpath(@__DIR__, "plots/diagnostic_posterior_scenario_$(i)_$(bandwidth)_$(str).png"))
     end
 end
 

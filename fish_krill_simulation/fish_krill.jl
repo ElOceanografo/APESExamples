@@ -109,7 +109,7 @@ for i in 1:3
         xlabel="n[1]", ylabel="n[2]", zlabel="a", markerstrokewidth=0, alpha=0.5, palette=:Blues) ;
     scatter!(p2, exp10.(chn_bb[Symbol("logn[1]")]), exp10.(chn_bb[Symbol("logn[2]")]), chn_bb[:a],
         markerstrokewidth=0, alpha=0.5, palette=:Oranges);
-    plot(p1, p2, size=(1500, 800))
+    plot(p1, p2, size=(1500, 900), margin=20px)
     savefig(joinpath(@__DIR__, "plots/diagnostic_posterior_$(i).png"))
 end
 
@@ -206,5 +206,5 @@ post_pred_plots = map(1:3) do i
     plot!(p, freqs_plot, mean(ppreds[i].bb), color=2, label="Broadband")
     return p
 end
-plot(post_pred_plots..., size=(800, 500))
+plot(post_pred_plots..., size=(800, 500), margin=10px)
 savefig(joinpath(@__DIR__, "plots/posterior_predictive.png"))
