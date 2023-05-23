@@ -47,7 +47,7 @@ cond(Σ_nb)
 labels = ["Hake" "Myctophid" "Squid" "Sergestid" "Siphonophore"]
 pal = [1 2 3 4 5]
 p1 = plot(freqs_plot, TS_plot, labels=labels, color=pal, legend=:bottomright,
-    xlabel="Frequency (kHz)", ylabel="TS (dB re m²)", title="A)",
+    xlabel="Frequency (kHz)", ylabel="TS (dB re m²)", title="(a)",
     titlealign=:left)
 scatter!(p1, freqs_bb, TS_bb, label="", color=pal, markerstrokewidth=0)
 vline!(p1, freqs_nb, linestyle=:dot, color=:grey, label="")
@@ -63,11 +63,11 @@ Sv_nb = Sv_bb[i_nb]
 Sv_plot = 10log10.(Σ_plot * N)
 
 p2 = plot(freqs_plot, Sv_plot .- 20, color=:black, label="Theoretical",
-    xlabel="Freq (kHz)", ylabel="Sv (dB re m⁻¹)", titlealign=:left, title="B)")
+    xlabel="Freq (kHz)", ylabel="Sv (dB re m⁻¹)", titlealign=:left, title="(b)")
 scatter!(p2, freqs_bb, Sv_bb .- 20, marker=:o, label="Broadband", color=1)
 scatter!(p2, freqs_nb, Sv_nb .- 20, markersize=8, color=2, label="Narrowband")
-plot(p1, p2, size=(800, 400), margin=10px)
-savefig(joinpath(@__DIR__, "plots/meso_mix_scenario_Sv.png"))
+plot(p1, p2, size=(800, 400), dpi=600, margin=10px)
+savefig(joinpath(@__DIR__, "plots/Fig_2_meso_mix_scenario_Sv.pdf"))
 
 
 #=
@@ -75,8 +75,6 @@ Setting up the different inference scenarios.
 =#
 # Vague, but slightly restrictive priors
 T = Distribution{Univariate, Continuous}
-# μprior2 = max.(5N, 0.01)
-# prior2 = T[truncated(Normal(0, μ), 0, Inf) for μ in μprior2]
 μprior1 = log10.(max.(N, 0.0025))
 prior1 = T[Normal(μ, 2.0) for μ in μprior1]
 
@@ -161,8 +159,8 @@ push!(subplots,
     plot(ones(1,3), labels=["Prior" "Narrowband" "Broadband"], linewidth=10,
          color=[:grey 2 1], legend=:left, xaxis=false, xticks=false,
          yaxis=false, yticks=false, ylabel="", legend_font_pointsize=10))
-plot(subplots..., size=(1000, 550), margin=5mm)
-savefig(joinpath(@__DIR__, "plots/meso_mix_posteriors.png"))
+plot(subplots..., size=(1000, 550), dpi=300, margin=5mm)
+savefig(joinpath(@__DIR__, "plots/Fig_6_meso_mix_posteriors.png"))
 
 plot(
     corrplot(exp.(Array(group(chains[1].nb, :logn)))),

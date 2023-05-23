@@ -32,7 +32,7 @@ TS_plot = [ts_fish.(freqs_plot) ts_krill.(freqs_plot)]
 Σ_plot = exp10.(TS_plot / 10)
 
 tsplot = plot(freqs_plot, TS_plot, label=["Fish" "Krill"], legend=:bottomright,
-    xlabel="Frequency (kHz)", ylabel="TS (dB re. m⁻¹)");
+    xlabel="Frequency (kHz)", ylabel="TS (dB re. m⁻¹)", title="(a)", titlealign=:left);
 vline!(tsplot, freqs_nb, linestyle=:dot, color=:black, label="");
 scatter!(tsplot, freqs_bb, TS_sim, color=[1 2], label="", markerstrokewidth=0)
 
@@ -57,14 +57,14 @@ Svs_nb = [Sv[i_nb] for Sv in Svs]
 Svs_plot = [10log10.(Σ_plot * N) for N in scenarios]
 pal = [2 3 1]
 svplot = plot(freqs_plot, Svs_plot, legend=:bottomright, label="", c=pal,
-    xlabel="Frequency (kHz)", ylabel="Sv (dB re m⁻¹)");
+    xlabel="Frequency (kHz)", ylabel="Sv (dB re m⁻¹)", title="(b)", titlealign=:left);
 vline!(svplot, freqs_nb, linestyle=:dot, color=:black, label="");
 scatter!(svplot, freqs_bb, Svs, legend=:bottomright, label="", c=pal, markershape=[:circle :square :utriangle],
     markerstrokewidth=0, markersize=2);
 scatter!(svplot, freqs_nb, Svs_nb, color=pal, markershape=[:circle :square :utriangle], 
     markersize=5, markerstrokewidth=2, labels=["Krill-dominated" "Mix" "Fish-dominated"])
-plot(tsplot, svplot, size=(800, 350), dpi=600, margin=20px)
-savefig(joinpath(@__DIR__, "plots/fish_krill_Sv.png"))
+plot(tsplot, svplot, size=(800, 325), dpi=600, margin=20px)
+savefig(joinpath(@__DIR__, "plots/Fig_1_fish_krill_Sv.pdf"))
 
 data_bb = [(backscatter=Sv, freqs=freqs_bb, coords=(depth,))
     for Sv in Svs]
@@ -149,7 +149,7 @@ post_plots = map(enumerate(chains)) do (i, chn)
     post_plot = plot(a_plot, n_plot, layout=(2,1))
 end
 plot(post_plots..., layout=(1, 3), size=(900, 500), dpi=350, margin=15px)
-savefig(joinpath(@__DIR__, "plots/fish_krill_posteriors.png"))
+savefig(joinpath(@__DIR__, "plots/Fig_5_fish_krill_posteriors.pdf"))
 
 
 df = map(enumerate(chains)) do tup

@@ -66,7 +66,7 @@ Sv = DimArray(cat(Sv..., dims=3), (Z(depths), D(distances), F(freqs)))
 sv = exp10.(Sv ./ 10)
 
 bottom = @chain dfs[1] begin
-    @subset(5 .< :depth .< 400)
+    @subset(10 .<= :depth .< 400)
     unstack(:depth, :distance, :Sv)
     @orderby(:depth)
     select(Not(:depth))
@@ -95,14 +95,12 @@ sv_plots = map(freqs) do f
     end
     
     p = heatmap(Sv[F(At(f))], yflip=true, title="", xticks=xticks, xlabel=xlabel, clim=(-90, -60),
-        # background_color_inside="#333333",
         topmargin=0px, bottommargin=0px, colorbar_title="Sᵥ ($(f) kHz)") 
     annotate!(p, annotation_x, annotation_y, annotation_text)
-    # annotate!(p, 15, 300, string(f) * " kHz")
-    plot!(distances, depths, b, yflip=true, aspect_ratio=0.01, xlims=(0, 18), ylims=(10, 400))
+    plot!(distances, depths, b, yflip=true, aspect_ratio=0.01, xlims=(0, 18), ylims=(10, 395))
 end
-plot(sv_plots..., layout=(5, 1), size=(800, 900), leftmargin=20px)
-savefig(joinpath(@__DIR__, "plots/echograms.png"))
+plot(sv_plots..., layout=(5, 1), size=(800, 900), dpi=300, leftmargin=20px)
+savefig(joinpath(@__DIR__, "plots/Fig_3_aleutian_echograms.png"))
 
 @everywhere begin
 
@@ -150,8 +148,8 @@ solution_map = apes(Sv, echomodel, solver_map, params=pars, distributed=true)
 
 fmissing(x, f) = ismissing(x) ? missing : f(x)
 
-heatmap(fmissing.(solution_map, x -> coef(x)[:a]), yflip=true, clims=(0, 0.0007))
-heatmap(fmissing.(solution_map, x -> coef(x)[Symbol("logn[2]")]), yflip=true,
+heatmap(fmissing.(solution_map, x -> coef(x.optimizer)[:a]), yflip=true, clims=(0, 0.0007))
+heatmap(fmissing.(solution_map, x -> coef(x.optimizer)[Symbol("logn[2]")]), yflip=true,
     clims=(-10, 0))
 
 solver_mcmc = MCMCSolver(verbose=false, nsamples=1000, nchains=4)
@@ -159,17 +157,17 @@ solution_mcmc = apes(Sv, echomodel, solver_mcmc, params=pars, distributed=true)
 
 thresh_mask = fmissing.(solution_mcmc, chn -> mean(chn[Symbol("logn[4]")]) .> -5 ? 1.0 : missing)
 p1 = heatmap(fmissing.(solution_mcmc, chn -> mean(1e3chn[:a])) .* thresh_mask, yflip=true, 
-    c=cgrad(:hawaii, rev=true), clims=(0.2, 1.2), title="A", titlealign=:left,
+    c=cgrad(:hawaii, rev=true), clims=(0.2, 1.2), title="(a)", titlealign=:left,
     colorbar_title="Bubble radius (mm)", size=(600, 350))
 plot!(p1, distances, depths, b, yflip=true, aspect_ratio=0.04, xlims=(0, 18), ylims=(5, 400))
 annotate!(p1, annotation_x, annotation_y, annotation_text)
 
 p2 = heatmap(fmissing.(solution_mcmc, chn -> std(1e3chn[:a])) .* thresh_mask, yflip=true, c=:viridis,
-    colorbar_title="Bubble radius C.V.", title="B", titlealign=:left)
+    colorbar_title="Bubble radius C.V.", title="(b)", titlealign=:left)
 plot!(p2, distances, depths, b, yflip=true, aspect_ratio=0.04, xlims=(0, 18), ylims=(5, 400))
 annotate!(p2, annotation_x, annotation_y, annotation_text)
-plot(p1, p2, size=(1000, 350), margin=15px)
-savefig(joinpath(@__DIR__, "plots/bubble_esr.png"))
+plot(p1, p2, size=(1000, 350), dpi=500, margin=15px)
+savefig(joinpath(@__DIR__, "plots/Fig_8_aleutian_bubble_esr.png"))
 
 
 meanplots = map(1:4) do i
@@ -179,7 +177,8 @@ meanplots = map(1:4) do i
     cl = (ll, ul)
     xticks = i == 4 ? true : false
     xlabel = i == 4 ? "Distance (km)" : ""
-    p = heatmap(μ, colorbartitle="log₁₀($(labels[i]) m⁻³)", yflip=true, title=['A':'D';][i], titlealign=:left,
+    p = heatmap(μ, colorbartitle="log₁₀($(labels[i]) m⁻³)", yflip=true,
+        title="($(['a':'d';][i]))", titlealign=:left,
         xlabel=xlabel, xticks=xticks, clims=cl, background_color_inside="#888888")
     annotate!(p, annotation_x, annotation_y, annotation_text)
     return p
@@ -199,9 +198,9 @@ end
 plot(
     plot(meanplots..., layout=(4, 1)),
     plot(cvplots..., layout=(4, 1)),
-    layout=(1, 2), size=(1200, 1000), leftmargin=15px
+    layout=(1, 2), size=(1200, 850), dpi=300, leftmargin=15px
 ) 
-savefig(joinpath(@__DIR__, "plots/posteriors.png"))
+savefig(joinpath(@__DIR__, "plots/Fig_7_aleutian_posteriors.png"))
 
 heatmap(fmissing.(solution_mcmc, chn -> mean(chn[:ϵ])), yflip=true, c=:viridis)
 savefig(joinpath(@__DIR__, "plots/epsilon.png"))

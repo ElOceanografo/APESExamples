@@ -131,14 +131,14 @@ solver_mcmc = MAPMCMCSolver(verbose=false, optimizer=BFGS(), nsamples=500, nchai
 solution_mcmc = apes(echo, echomodel, solver_mcmc, params=pars, distributed=true)
 
 p1 = heatmap(fmissing.(solution_mcmc, chn -> median(1e3chn[:a])), yflip=true, 
-    c=cgrad(:hawaii, rev=true), title="A", title_align=:left,
+    c=cgrad(:hawaii, rev=true), title="(a)", title_align=:left,
     colorbar_title="Bubble radius (mm)", size=(600, 350))
 p2 = heatmap(fmissing.(solution_mcmc, chn -> std(1e3chn[:a])), yflip=true, c=:viridis,
-    title="B", title_align=:left, colorbar_title="Bubble radius C.V.")
-plot(p1, p2, size=(1000, 300), margin=15px, xticks=(tticks, tlabels), background_color_inside="#888888")
-savefig(joinpath(@__DIR__, "plots/bubble_esr.png"))
+    title="(b)", title_align=:left, colorbar_title="Bubble radius C.V.")
+plot(p1, p2, size=(1000, 300), dpi=500, margin=20px, xticks=(tticks, tlabels), background_color_inside="#888888")
+savefig(joinpath(@__DIR__, "plots/Fig_10_barnabas_bubble_esr.png"))
 
-titles = ["A. Large fish", "B. Krill", "C. Bubble-like"]
+titles = ["(a) Large fish", "(b) Krill", "(c) Bubble-like"]
 meanplots = map(1:3) do i
     μ = fmissing.(solution_mcmc, chn -> mean((chn[Symbol("logn[$(i)]")])))
     ul = quantile(skipmissing(vec(μ)), 0.99)
@@ -165,9 +165,9 @@ end
 plot(
     plot(meanplots..., layout=(3, 1)),
     plot(cvplots..., layout=(3, 1)),
-    layout=(1, 2), size=(1200, 700), margin=15px
+    layout=(1, 2), size=(1200, 700), dpi=500, margin=15px
 ) 
-savefig(joinpath(@__DIR__, "plots/posteriors.png"))
+savefig(joinpath(@__DIR__, "plots/Fig_9_barnabas_posteriors.png"))
 
 
 p_epsilon = heatmap(fmissing.(solution_mcmc, chn -> mean(chn[:ϵ])), yflip=true, c=:viridis,
