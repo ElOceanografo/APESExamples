@@ -64,7 +64,7 @@ scatter!(svplot, freqs_bb, Svs, legend=:bottomright, label="", c=pal, markershap
 scatter!(svplot, freqs_nb, Svs_nb, color=pal, markershape=[:circle :square :utriangle], 
     markersize=5, markerstrokewidth=2, labels=["Krill-dominated" "Mix" "Fish-dominated"])
 plot(tsplot, svplot, size=(800, 325), dpi=600, margin=20px)
-savefig(joinpath(@__DIR__, "plots/Fig_1_fish_krill_Sv.pdf"))
+savefig(joinpath(@__DIR__, "plots/Fig_1_fish_krill_Sv.png"))
 
 data_bb = [(backscatter=Sv, freqs=freqs_bb, coords=(depth,))
     for Sv in Svs]
@@ -149,7 +149,7 @@ post_plots = map(enumerate(chains)) do (i, chn)
     post_plot = plot(a_plot, n_plot, layout=(2,1))
 end
 plot(post_plots..., layout=(1, 3), size=(900, 500), dpi=350, margin=15px)
-savefig(joinpath(@__DIR__, "plots/Fig_5_fish_krill_posteriors.pdf"))
+savefig(joinpath(@__DIR__, "plots/Fig_5_fish_krill_posteriors.png"))
 
 
 df = map(enumerate(chains)) do tup

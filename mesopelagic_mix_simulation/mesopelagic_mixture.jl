@@ -67,7 +67,7 @@ p2 = plot(freqs_plot, Sv_plot .- 20, color=:black, label="Theoretical",
 scatter!(p2, freqs_bb, Sv_bb .- 20, marker=:o, label="Broadband", color=1)
 scatter!(p2, freqs_nb, Sv_nb .- 20, markersize=8, color=2, label="Narrowband")
 plot(p1, p2, size=(800, 400), dpi=600, margin=10px)
-savefig(joinpath(@__DIR__, "plots/Fig_2_meso_mix_scenario_Sv.pdf"))
+savefig(joinpath(@__DIR__, "plots/Fig_2_meso_mix_scenario_Sv.png"))
 
 
 #=
