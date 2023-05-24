@@ -4,10 +4,10 @@ This repository contains data and code to reproduce the examples, analyses, and 
 from "What, how many, and how sure? A practical Bayesian inverse approach to identify and quantify animals from fisheries acoustic data" by Samuel Urmy, Alex De Robertis, and Christopher Bassett.
 (Journal, Volume, Issue, Pages, DOI).
 
-To run the example problems, you will need to [install Julia](https://julialang.org/downloads/) (v1.8 or higher) and run it in this directory. This project includes a self-contained environment for reproducibility. To install all packages at the version used for the publication, type `]` at the Julia command line to enter package-manager mode. The prompt should change from `julia>` to `(@v1.8) pkg>`. From here, run the following commands to activate the APESExamples environment and download all required packages.
+To run the example problems, you will need to [install Julia](https://julialang.org/downloads/) (v1.9 or higher) and run it in this directory. This project includes a self-contained environment for reproducibility. To install all packages at the version used for the publication, type `]` at the Julia command line to enter package-manager mode. The prompt should change from `julia>` to `(@v1.9) pkg>`. From here, run the following commands to activate the APESExamples environment and download all required packages.
 
 ```
-(@v1.8) pkg> activate .
+(@v1.9) pkg> activate .
   Activating project at <wherever you saved the repository>
 
 (APESExamples) pkg> instantiate
@@ -23,4 +23,4 @@ Each subdirectory here contains a script to reproduce one of the analyses from t
 include("fish_krill_simulation/fish_krill.jl")
 ```
 
-Note that the Aleutian narrowband and Barnabas broadband examples will attempt to use all available cores on your machine and will take on the order of an hour to run, depending on you computer's speed and number of processors.
+Note that the Aleutian narrowband and Barnabas broadband examples will attempt to use all available cores on your machine and will take on the order of an 1-2 hours to run, depending on you computer's speed and number of processors.
