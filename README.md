@@ -22,9 +22,5 @@ Each subdirectory here contains a script to reproduce one of the analyses from t
 include("fish_krill_simulation/fish_krill.jl")
 ```
 
-<<<<<<< HEAD
 Note that the Aleutian narrowband and Barnabas broadband examples will attempt to use all available cores on your machine and will take an hour or more to run, depending on your
 computer's speed and number of processors.
-=======
-Note that the Aleutian narrowband and Barnabas broadband examples will attempt to use all available cores on your machine and will take on the order of an 1-2 hours to run, depending on you computer's speed and number of processors.
->>>>>>> 55b8b659d42f3027007983a8ee16f67e080b0711
