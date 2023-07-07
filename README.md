@@ -3,11 +3,7 @@
 This repository contains data and code to reproduce the examples, analyses, and figures
 from "A  Bayesian inverse approach to identify and quantify organisms from fisheries acoustic data" by Samuel Urmy, Alex De Robertis, and Christopher Bassett (2023), *ICES Journal of Marine Science*,  https://doi.org/10.1093/icesjms/fsad102.
 
-<<<<<<< HEAD
 To run the example problems, you will need to [install Julia](https://julialang.org/downloads/) (v1.8 or higher) and run it in this directory. This project includes a self-contained environment for reproducibility. To install all packages at the version used for the publication, type `]` at the Julia command line to enter package-manager mode. The prompt should change from `julia>` to `(@v1.9) pkg>`. From here, run the following commands to activate the APESExamples environment and download all required packages.
-=======
-To run the example problems, you will need to [install Julia](https://julialang.org/downloads/) (v1.9 or higher) and run it in this directory. This project includes a self-contained environment for reproducibility. To install all packages at the version used for the publication, type `]` at the Julia command line to enter package-manager mode. The prompt should change from `julia>` to `(@v1.9) pkg>`. From here, run the following commands to activate the APESExamples environment and download all required packages.
->>>>>>> 55b8b659d42f3027007983a8ee16f67e080b0711
 
 ```
 (@v1.9) pkg> activate .
