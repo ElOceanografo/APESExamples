@@ -24,3 +24,5 @@ include("fish_krill_simulation/fish_krill.jl")
 
 Note that the Aleutian narrowband and Barnabas broadband examples will attempt to use all available cores on your machine and will take an hour or more to run, depending on your
 computer's speed and number of processors.
+
+
